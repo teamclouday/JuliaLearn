@@ -73,7 +73,7 @@ function predict(X::Array, beta::Array)::Array
     @assert size(X)[2] == size(beta)[1]
     X_combined = X * beta
     prob = sigmoid(X_combined)
-    real_prob::Array{Integer} = map(m -> m >= 0.5 ? 1.0 : 0.0, prob)
+    real_prob::Array{Float64} = map(m -> m >= 0.5 ? 1.0 : 0.0, prob)
     return real_prob
 end
 
@@ -87,7 +87,7 @@ Returns `nothing`
 ------
 Note: `beta` will be updated inplace
 """
-function learn!(X::Array, y::Array, beta::Array, alpha::AbstractFloat)
+function learn!(X::Array, y::Array, beta::Array, alpha::AbstractFloat)::AbstractFloat
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert ndims(beta) == 1
@@ -98,7 +98,8 @@ function learn!(X::Array, y::Array, beta::Array, alpha::AbstractFloat)
     gradients .= gradients ./ size(X)[1]
     gradients .= gradients .* alpha
     beta .= beta .- gradients
-    return nothing
+    avg_gradient = Statistics.mean(gradients)
+    return avg_gradient
 end
 
 """
@@ -109,7 +110,7 @@ If `X` is shape (M, N)\\
 ------
 Returns updated `beta`
 """
-function learn(X::Array, y::Array, beta::Array, alpha::AbstractFloat)::Array
+function learn(X::Array, y::Array, beta::Array, alpha::AbstractFloat)::Tuple{Array,AbstractFloat}
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert ndims(beta) == 1
@@ -120,7 +121,8 @@ function learn(X::Array, y::Array, beta::Array, alpha::AbstractFloat)::Array
     gradients .= gradients ./ size(X)[1]
     gradients .= gradients .* alpha
     beta = beta .- gradients
-    return beta
+    avg_gradient = Statistics.mean(gradients)
+    return beta, avg_gradient
 end
 
 """
@@ -133,7 +135,8 @@ If `X` is shape (M, N)\\
 if `return_all`, then return all `beta`(weights) for each iteration\\
 else, return the final `beta`(weight) after iterations
 """
-function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::Integer=100, return_all::Bool=false)::Array
+function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::Integer=100,
+        tol::AbstractFloat=0.0001, return_all::Bool=false, verbose::Bool=false)::Array
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert size(X)[1] == size(y)[1]
@@ -141,6 +144,7 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::
     X .= Float64.(X)
     y .= Float64.(y)
     beta = Random.randn(size(X)[2])
+    avg_gradient = nothing
     res = nothing
     if return_all
         res = reshape(beta, (1, size(beta)[1]))
@@ -148,12 +152,29 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::
         res = beta
     end
     for i = 1:max_iter
+        gradient = 0.0
         if return_all
-            beta = learn(X, y, beta, learning_rate)
+            beta, gradient = learn(X, y, beta, learning_rate)
             res = cat(res, reshape(beta, (1, size(beta)[1])), dims=1)
         else
-            learn!(X, y, beta, learning_rate)
+            gradient = learn!(X, y, beta, learning_rate)
             res .= beta
+        end
+        if verbose
+            c = cost(X, y, beta)
+            acc = accuracy(predict(X, beta), y)
+            println("Iter: ", i)
+            println("Cost = ", c)
+            println("Accuracy = ", acc)
+            println()
+        end
+        if avg_gradient === nothing
+            avg_gradient = gradient
+        else
+            if abs(avg_gradient-gradient) < tol
+                break
+            end
+            avg_gradient = gradient
         end
     end
     return res
@@ -168,13 +189,8 @@ Returns accuracy as float
 function accuracy(y_pred::Array, y_real::Array)::AbstractFloat
     @assert ndims(y_pred) == ndims(y_real) == 1
     @assert size(y_pred) == size(y_real)
-    sum = 0
-    for (m, n) in zip(y_pred, y_real)
-        if m == n
-            sum += 1
-        end
-    end
-    return sum / size(y_pred)[1]
+    acc = Statistics.mean(y_pred .== y_real)
+    return acc
 end
 
 end
