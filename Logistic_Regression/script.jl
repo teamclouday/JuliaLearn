@@ -132,8 +132,10 @@ If `X` is shape (M, N)\\
 `y` should be (M,)\\
 `max_iter` should be >= 0
 ------
-if `return_all`, then return all `beta`(weights) for each iteration\\
-else, return the final `beta`(weight) after iterations
+If `return_all`, then return all `beta`(weights) for each iteration\\
+Else, return the final `beta`(weight) after iterations
+------
+Set `tol` to 0.0, to force run `max_iter` iterations
 """
 function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::Integer=100,
         tol::AbstractFloat=0.0001, return_all::Bool=false, verbose::Bool=false)::Array
@@ -141,6 +143,7 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::
     @assert ndims(y) == 1
     @assert size(X)[1] == size(y)[1]
     @assert max_iter >= 0
+    @assert tol >= 0.0
     X .= Float64.(X)
     y .= Float64.(y)
     beta = Random.randn(size(X)[2])
