@@ -33,7 +33,7 @@ end
 Cost function for logistic Regression\\
 If `X` is shape (M, N)\\
 `y` should be (M,)\\
-`beta` should be (N+1,)
+`beta` should be (N,)
 ------
 May not be used
 """
@@ -41,13 +41,11 @@ function cost(X::CuArray, y::CuArray, beta::CuArray)::AbstractFloat
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert ndims(beta) == 1
-    @assert size(X) == (size(y)[1], size(beta)[1]-1)
+    @assert size(X) == (size(y)[1], size(beta)[1])
     m = size(X)[1]
-    X_extended = hcat(X, ones(size(X)[1]))
-    X_combined = X_extended * reshape(beta, (size(beta)[1], 1))
+    X_combined = X * beta
     prob = sigmoid(X_combined)
-    y_prep = reshape(y, (size(y)[1], 1))
-    vec = y_prep .* (log.(prob)) .+ (1 .- y_prep) .* (log.(1 .- prob))
+    vec = y .* (log.(prob)) .+ (1 .- y) .* (log.(1 .- prob))
     cost = -1 / float(m) * sum(vec)
     return cost
 end
@@ -55,34 +53,30 @@ end
 """
 Predict function for Logistic Regression\\
 If `X` is shape (M, N)\\
-`beta` should be (N+1,)\\
+`beta` should be (N,)\\
 Returns 1d array of real probabilities
 """
 function predict_proba(X::CuArray, beta::CuArray)::CuArray
     @assert ndims(X) == 2
     @assert ndims(beta) == 1
-    @assert size(X)[2] == size(beta)[1]-1
-    X_extended = hcat(X, ones(size(X)[1]))
-    X_combined = X_extended * reshape(beta, (size(beta)[1], 1))
+    @assert size(X)[2] == size(beta)[1]
+    X_combined = X * beta
     prob = sigmoid(X_combined)
-    prob = reshape(prob, (size(prob)[1]*size(prob)[2],)) # flatten to 1d array
     return prob
 end
 
 """
 Predict function for Logistic Regression\\
 If `X` is shape (M, N)\\
-`beta` should be (N+1,)\\
+`beta` should be (N,)\\
 Returns 1d array of 0,1
 """
 function predict(X::CuArray, beta::CuArray)::CuArray
     @assert ndims(X) == 2
     @assert ndims(beta) == 1
-    @assert size(X)[2] == size(beta)[1]-1
-    X_extended = hcat(X, ones(size(X)[1]))
-    X_combined = X_extended * reshape(beta, (size(beta)[1], 1))
+    @assert size(X)[2] == size(beta)[1]
+    X_combined = X * beta
     prob = sigmoid(X_combined)
-    prob = reshape(prob, (size(prob)[1]*size(prob)[2],)) # flatten to 1d array
     real_prob::CuArray{Integer} = map(m -> m >= 0.5 ? 1.0 : 0.0, prob)
     return real_prob
 end
@@ -91,7 +85,7 @@ end
 Learning function for Gradient Descent\\
 If `X` is shape (M, N)\\
 `y` should be (M,)\\
-`beta` should be (N+1,)
+`beta` should be (N,)
 ------
 Returns `nothing`
 ------
@@ -101,15 +95,13 @@ function learn!(X::CuArray, y::CuArray, beta::CuArray, alpha::AbstractFloat)
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert ndims(beta) == 1
-    @assert size(X) == (size(y)[1], size(beta)[1]-1)
+    @assert size(X) == (size(y)[1], size(beta)[1])
     predictions = predict_proba(X, beta)
     offset = predictions .- y
-    offset = reshape(offset, (size(offset)[1], 1))
-    X_extended = hcat(X, ones(size(X)[1]))
-    gradients = X_extended' * offset
+    gradients = X' * offset
     gradients .= gradients ./ size(X)[1]
     gradients .= gradients .* alpha
-    beta .= beta .- reshape(gradients, (size(gradients)[1]*size(gradients)[2],))
+    beta .= beta .- gradients
     return nothing
 end
 
@@ -117,7 +109,7 @@ end
 Learning function for Gradient Descent\\
 If `X` is shape (M, N)\\
 `y` should be (M,)\\
-`beta` should be (N+1,)
+`beta` should be (N,)
 ------
 Returns updated `beta`
 """
@@ -125,15 +117,13 @@ function learn(X::CuArray, y::CuArray, beta::CuArray, alpha::AbstractFloat)::CuA
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert ndims(beta) == 1
-    @assert size(X) == (size(y)[1], size(beta)[1]-1)
+    @assert size(X) == (size(y)[1], size(beta)[1])
     predictions = predict_proba(X, beta)
     offset = predictions .- y
-    offset = reshape(offset, (size(offset)[1], 1))
-    X_extended = hcat(X, ones(size(X)[1]))
-    gradients = X_extended' * offset
+    gradients = X' * offset
     gradients .= gradients ./ size(X)[1]
     gradients .= gradients .* alpha
-    beta = beta .- reshape(gradients, (size(gradients)[1]*size(gradients)[2],))
+    beta = beta .- gradients
     return beta
 end
 
@@ -152,7 +142,7 @@ function train(X::CuArray, y::CuArray; learning_rate::AbstractFloat=0.01, max_it
     @assert ndims(y) == 1
     @assert size(X)[1] == size(y)[1]
     @assert max_iter >= 0
-    beta = CuArray(Random.randn(size(X)[2]+1))
+    beta = CuArray(Random.randn(size(X)[2]))
     res = nothing
     if return_all
         res = reshape(beta, (1, size(beta)[1]))
