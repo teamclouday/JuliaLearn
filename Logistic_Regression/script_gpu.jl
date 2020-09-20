@@ -13,7 +13,7 @@ CUDA.allowscalar(false)
 Helper function to scale input `X` to unit variance\\
 `X` is required to have dimension 2
 """
-function scale(X::CuArray)::CuArray
+function scale(X::Array)::Array
     @assert ndims(X) == 2
     u = Statistics.mean(X, dims=1)
     s = Statistics.std(X, dims=1)
@@ -25,7 +25,7 @@ end
 Sigmoid function on array `Z`
 """
 function sigmoid(Z::CuArray)::CuArray
-    denom = 1 .+ (float(MathConstants.e) .^ (-Z))
+    denom = 1 .+ (Float32(MathConstants.e) .^ (-Z))
     return 1 ./ denom
 end
 
@@ -50,6 +50,23 @@ function cost(X::CuArray, y::CuArray, beta::CuArray)::AbstractFloat
     return cost
 end
 
+function cost(X::Array, y::Array, beta::Array)::AbstractFloat
+    @assert ndims(X) == 2
+    @assert ndims(y) == 1
+    @assert ndims(beta) == 1
+    @assert size(X) == (size(y)[1], size(beta)[1])
+    X = CUDA.CuArray(Float32.(X))
+    y = CUDA.CuArray(Float32.(y))
+    beta = CUDA.CuArray(Float32.(beta))
+    m = size(X)[1]
+    X_combined = X * beta
+    prob = sigmoid(X_combined)
+    vec = y .* (log.(prob)) .+ (1 .- y) .* (log.(1 .- prob))
+    cost = -1 / float(m) * sum(vec)
+    CUDA.reclaim()
+    return cost
+end
+
 """
 Predict function for Logistic Regression\\
 If `X` is shape (M, N)\\
@@ -65,6 +82,19 @@ function predict_proba(X::CuArray, beta::CuArray)::CuArray
     return prob
 end
 
+function predict_proba(X::Array, beta::Array)::Array
+    @assert ndims(X) == 2
+    @assert ndims(beta) == 1
+    @assert size(X)[2] == size(beta)[1]
+    X = CUDA.CuArray(Float32.(X))
+    beta = CUDA.CuArray(Float32.(beta))
+    X_combined = X * beta
+    prob = sigmoid(X_combined)
+    prob_cpu = Array(prob)
+    CUDA.reclaim()
+    return prob_cpu
+end
+
 """
 Predict function for Logistic Regression\\
 If `X` is shape (M, N)\\
@@ -78,6 +108,20 @@ function predict(X::CuArray, beta::CuArray)::CuArray
     X_combined = X * beta
     prob = sigmoid(X_combined)
     real_prob::CuArray{Integer} = map(m -> m >= 0.5 ? 1.0 : 0.0, prob)
+    return real_prob
+end
+
+function predict(X::Array, beta::Array)::Array
+    @assert ndims(X) == 2
+    @assert ndims(beta) == 1
+    @assert size(X)[2] == size(beta)[1]
+    X = CUDA.CuArray(Float32.(X))
+    beta = CUDA.CuArray(Float32.(beta))
+    X_combined = X * beta
+    prob = sigmoid(X_combined)
+    prob_cpu = Array(prob)
+    real_prob::Array{Integer} = map(m -> m >= 0.5 ? 1.0 : 0.0, prob_cpu)
+    CUDA.reclaim()
     return real_prob
 end
 
@@ -137,12 +181,14 @@ If `X` is shape (M, N)\\
 if `return_all`, then return all `beta`(weights) for each iteration\\
 else, return the final `beta`(weight) after iterations
 """
-function train(X::CuArray, y::CuArray; learning_rate::AbstractFloat=0.01, max_iter::Integer=100, return_all::Bool=false)::CuArray
+function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::Integer=100, return_all::Bool=false)::Array
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert size(X)[1] == size(y)[1]
     @assert max_iter >= 0
-    beta = CuArray(Random.randn(size(X)[2]))
+    X = CUDA.CuArray(Float32.(X))
+    y = CUDA.CuArray(Float32.(y))
+    beta = CuArray(Float32.(Random.randn(size(X)[2])))
     res = nothing
     if return_all
         res = reshape(beta, (1, size(beta)[1]))
@@ -158,7 +204,9 @@ function train(X::CuArray, y::CuArray; learning_rate::AbstractFloat=0.01, max_it
             res .= beta
         end
     end
-    return res
+    res_cpu = Array(res)
+    CUDA.reclaim()
+    return res_cpu
 end
 
 """
@@ -167,7 +215,7 @@ Accuracy function for Logisitic Regression\\
 ------
 Returns accuracy as float
 """
-function accuracy(y_pred::CuArray, y_real::CuArray)::AbstractFloat
+function accuracy(y_pred::Array, y_real::Array)::AbstractFloat
     @assert ndims(y_pred) == ndims(y_real) == 1
     @assert size(y_pred) == size(y_real)
     sum = 0
