@@ -21,7 +21,7 @@ end
 Sigmoid function on array `Z`
 """
 function sigmoid(Z::Array)::Array
-    denom = 1 .+ (float(MathConstants.e) .^ (-Z))
+    denom = 1 .+ (Float64(MathConstants.e) .^ (-Z))
     return 1 ./ denom
 end
 
@@ -138,8 +138,8 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::
     @assert ndims(y) == 1
     @assert size(X)[1] == size(y)[1]
     @assert max_iter >= 0
-    X .= Float32.(X)
-    y .= Float32.(y)
+    X .= Float64.(X)
+    y .= Float64.(y)
     beta = Random.randn(size(X)[2])
     res = nothing
     if return_all
