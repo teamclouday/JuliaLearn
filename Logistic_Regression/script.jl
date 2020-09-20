@@ -144,10 +144,10 @@ If `return_all`, then return all `beta`(weights) for each iteration\\
 Else, return the final `beta`(weight) after iterations\\
 Each `beta` is in shape (N+1,)
 ------
-Set `tol` to 0.0, to force run `max_iter` iterations
+Set `tol` to 0.0, to force run maximum iteractions possible in `Float64` precision
 """
-function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::Integer=1000,
-        n_iter_no_change::Integer=5, tol::AbstractFloat=0.0001, return_all::Bool=false,
+function train(X::Array, y::Array; learning_rate::AbstractFloat=0.1, max_iter::Integer=1000,
+        n_iter_no_change::Integer=5, tol::AbstractFloat=0.001, return_all::Bool=false,
         verbose::Bool=false)::Array
     @assert ndims(X) == 2
     @assert ndims(y) == 1
@@ -168,6 +168,9 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::
         res = beta
     end
     for i = 1:max_iter
+        if n_cost_no_change <= 0
+            break
+        end
         if return_all
             beta = learn(X, y, beta, learning_rate)
             res = cat(res, reshape(beta, (1, size(beta)[1])), dims=1)
@@ -183,19 +186,15 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::
             println("Accuracy = ", acc)
             println()
         end
-        if best_cost === nothing
+        if best_cost === nothing || isnan(best_cost)
             best_cost = new_cost
         else
             if new_cost > best_cost - tol
                 n_cost_no_change -= 1
-            end
-            if new_cost < best_cost
-                best_cost = new_cost
+            else
+                best_cost = min(new_cost, best_cost)
                 n_cost_no_change = n_iter_no_change
             end
-        end
-        if n_cost_no_change < 0
-            break
         end
     end
     return res

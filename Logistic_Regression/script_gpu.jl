@@ -201,10 +201,10 @@ If `X` is shape (M, N)\\
 If `return_all`, then return all `beta`(weights) for each iteration\\
 Else, return the final `beta`(weight) after iterations
 ------
-Set `tol` to 0.0, to force run `max_iter` iterations
+Set `tol` to 0.0, to force run maximum iteractions possible in `Float32` precision
 """
-function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::Integer=1000,
-        n_iter_no_change::Integer=5, tol::AbstractFloat=0.0001, return_all::Bool=false,
+function train(X::Array, y::Array; learning_rate::AbstractFloat=0.1, max_iter::Integer=1000,
+        n_iter_no_change::Integer=5, tol::AbstractFloat=0.001, return_all::Bool=false,
         verbose::Bool=false)::Array
     @assert ndims(X) == 2
     @assert ndims(y) == 1
@@ -212,6 +212,7 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::
     @assert max_iter >= 0
     @assert n_iter_no_change >= 0
     @assert tol >= 0.0
+    tol = Float32(tol)
     X = CUDA.CuArray(Float32.(hcat(X, ones(size(X)[1]))))
     y = CUDA.CuArray(Float32.(y))
     beta = CuArray(Float32.(Random.randn(size(X)[2])))
@@ -224,6 +225,9 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::
         res = beta
     end
     for i = 1:max_iter
+        if n_cost_no_change <= 0
+            break
+        end
         if return_all
             beta = learn(X, y, beta, learning_rate)
             res = cat(res, reshape(beta, (1, size(beta)[1])), dims=1)
@@ -233,26 +237,21 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.01, max_iter::
         end
         new_cost = cost(X, y, beta)
         if verbose
-            c = cost(X, y, beta)
             acc = accuracy(predict(X, beta), y)
             println("Iter: ", i)
             println("Cost = ", new_cost)
             println("Accuracy = ", acc)
             println()
         end
-        if best_cost === nothing
+        if best_cost === nothing || isnan(best_cost)
             best_cost = new_cost
         else
             if new_cost > best_cost - tol
                 n_cost_no_change -= 1
-            end
-            if new_cost < best_cost
-                best_cost = new_cost
+            else
+                best_cost = min(new_cost, best_cost)
                 n_cost_no_change = n_iter_no_change
             end
-        end
-        if n_cost_no_change < 0
-            break
         end
     end
     res_cpu = Array(res)
