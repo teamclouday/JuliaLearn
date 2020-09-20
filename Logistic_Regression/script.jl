@@ -61,7 +61,7 @@ function predict_proba(X::Array, beta::Array)::Array
     X_extended = hcat(X, ones(size(X)[1]))
     X_combined = X_extended * reshape(beta, (size(beta)[1], 1))
     prob = sigmoid(X_combined)
-    prob = [(prob...)...] # flatten to 1d array
+    prob = reshape(prob, (size(prob)[1]*size(prob)[2],)) # flatten to 1d array
     return prob
 end
 
@@ -78,7 +78,7 @@ function predict(X::Array, beta::Array)::Array
     X_extended = hcat(X, ones(size(X)[1]))
     X_combined = X_extended * reshape(beta, (size(beta)[1], 1))
     prob = sigmoid(X_combined)
-    prob = [(prob...)...] # flatten to 1d array
+    prob = reshape(prob, (size(prob)[1]*size(prob)[2],)) # flatten to 1d array
     real_prob::Array{Integer} = map(m -> m >= 0.5 ? 1 : 0, prob)
     return real_prob
 end
@@ -103,9 +103,9 @@ function learn!(X::Array, y::Array, beta::Array, alpha::AbstractFloat)
     offset = reshape(offset, (size(offset)[1], 1))
     X_extended = hcat(X, ones(size(X)[1]))
     gradients = X_extended' * offset
-    gradients = gradients ./ size(X)[1]
-    gradients = gradients .* alpha
-    beta .= beta .- [(gradients...)...]
+    gradients .= gradients ./ size(X)[1]
+    gradients .= gradients .* alpha
+    beta .= beta .- reshape(gradients, (size(gradients)[1]*size(gradients)[2],))
     return nothing
 end
 
@@ -127,9 +127,9 @@ function learn(X::Array, y::Array, beta::Array, alpha::AbstractFloat)::Array
     offset = reshape(offset, (size(offset)[1], 1))
     X_extended = hcat(X, ones(size(X)[1]))
     gradients = X_extended' * offset
-    gradients = gradients ./ size(X)[1]
-    gradients = gradients .* alpha
-    beta = beta .- [(gradients...)...]
+    gradients .= gradients ./ size(X)[1]
+    gradients .= gradients .* alpha
+    beta = beta .- reshape(gradients, (size(gradients)[1]*size(gradients)[2],))
     return beta
 end
 

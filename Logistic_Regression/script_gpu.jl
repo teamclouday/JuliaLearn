@@ -107,8 +107,8 @@ function learn!(X::CuArray, y::CuArray, beta::CuArray, alpha::AbstractFloat)
     offset = reshape(offset, (size(offset)[1], 1))
     X_extended = hcat(X, ones(size(X)[1]))
     gradients = X_extended' * offset
-    gradients = gradients ./ size(X)[1]
-    gradients = gradients .* alpha
+    gradients .= gradients ./ size(X)[1]
+    gradients .= gradients .* alpha
     beta .= beta .- reshape(gradients, (size(gradients)[1]*size(gradients)[2],))
     return nothing
 end
@@ -131,8 +131,8 @@ function learn(X::CuArray, y::CuArray, beta::CuArray, alpha::AbstractFloat)::CuA
     offset = reshape(offset, (size(offset)[1], 1))
     X_extended = hcat(X, ones(size(X)[1]))
     gradients = X_extended' * offset
-    gradients = gradients ./ size(X)[1]
-    gradients = gradients .* alpha
+    gradients .= gradients ./ size(X)[1]
+    gradients .= gradients .* alpha
     beta = beta .- reshape(gradients, (size(gradients)[1]*size(gradients)[2],))
     return beta
 end
