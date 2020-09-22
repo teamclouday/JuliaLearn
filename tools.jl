@@ -109,7 +109,8 @@ e.g. x1 -> x1 * 2 + 1\\
 Returns a Tuple for X and y
 """
 function data_generate_linear_2d(;linear_func::Function=k -> k * 2 + 1, data_size::Integer=1000,
-        range_min::AbstractFloat=0.0, range_max::AbstractFloat=100.0, range_step::AbstractFloat=0.1)::Tuple{Array, Array}
+        range_min::AbstractFloat=0.0, range_max::AbstractFloat=100.0, range_step::AbstractFloat=0.1,
+        random_scale::AbstractFloat=20.0)::Tuple{Array, Array}
     @assert data_size > 0
     @assert range_max > range_min
     @assert range_step > 0
@@ -117,7 +118,7 @@ function data_generate_linear_2d(;linear_func::Function=k -> k * 2 + 1, data_siz
     X_data = Random.rand(range_min:range_step:range_max, (data_size, 2))
     Y_data = Array{Int64}(undef, data_size)
     for i = 1:size(X_data)[1]
-        if X_data[i, 2] > linear_func(X_data[i, 1]) + Random.randn() * sqrt(range_max-range_min)
+        if X_data[i, 2] > linear_func(X_data[i, 1]) + Random.randn() * random_scale
             Y_data[i] = 0
         else
             Y_data[i] = 1
