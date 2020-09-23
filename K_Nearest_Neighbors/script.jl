@@ -90,6 +90,36 @@ function predict_naive(X_predict::Array{T} where T<:Number, X_data::Array{T} whe
 end
 
 """
+Same as `predict_naive`\\
+But use euclidean distance instead of cosine similarity
+"""
+function predict_naive_fun(X_predict::Array{T} where T<:Number, X_data::Array{T} where T<:Number, Y_data::Array{T} where T<:Number; K::Integer=5)::Array
+    @assert ndims(X_data) == 2
+    @assert ndims(Y_data) == 1
+    @assert size(X_data)[1] == size(Y_data)[1]
+    @assert 0 < ndims(X_predict) <= 2
+    @assert 0 < K < size(X_data)[1]
+    if ndims(X_predict) < 2
+        X_predict = reshape(X_predict, (1, size(X_predict)[1]))
+    end
+    @assert size(X_predict)[2] == size(X_data)[2]
+    result = Array{Number}(undef, size(X_predict)[1])
+    sim = Array{Tuple{Integer, AbstractFloat}}(undef, size(X_data)[1])
+    for i in 1:size(X_predict)[1]
+        vec_predict = X_predict[i, :]
+        for j in 1:size(X_data)[1]
+            vec_data = X_data[j, :]
+            vec_similarity = dist_sim(vec_predict, vec_data)
+            sim[j] = (j, vec_similarity)
+        end
+        sort!(sim, by=m->m[2])
+        K_nearest_votes = Y_data[[m[1] for m in sim[1:K]]]
+        result[i] = majority_vote(K_nearest_votes)
+    end
+    return result
+end
+
+"""
 The KdTree structure for `predict_kdtree`
 """
 mutable struct KdTree
