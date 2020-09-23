@@ -4,9 +4,6 @@ export cosine_sim, dist_sim, majority_vote, predict_naive
 export KdTree, create_kdtree, predict_kdtree
 export BallTree, create_balltree, predict_balltree
 
-include("../tools.jl")
-import .JuTools
-
 import Statistics
 import Random
 import LinearAlgebra
