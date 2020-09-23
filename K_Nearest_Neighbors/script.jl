@@ -107,6 +107,7 @@ function create_kdtree(X_data::Array{T} where T<:Number, Y_data::Array{T} where 
     @assert ndims(Y_data) == 1
     @assert size(X_data)[1] == size(Y_data)[1]
     function kdtree_recursive_generate(X_data::Array, Y_data::Array, depth::Integer, n_axes::Integer)::KdTree
+        # recursively generate kdtree structure
         curr_axis = mod(depth, n_axes) + 1 # array starts from 1
         data_combined = hcat(X_data, Y_data)
         data_combined = sortslices(data_combined, by=m->m[curr_axis], dims=1)
@@ -143,6 +144,8 @@ function predict_kdtree(X_predict::Array{T} where T<:Number, kdtree::KdTree; K::
 
     function kdtree_closest_max(kdtree_closest::Array{Union{KdTree, Nothing}},
                 kdtree_closest_val::Array{AbstractFloat})::Tuple{Integer, AbstractFloat}
+        # find the maximum value in kdtree_closest_val
+        # return its index and value
         default = (0, 0.0)
         for i in 1:size(kdtree_closest)[1]
             if kdtree_closest[i] === nothing
@@ -156,6 +159,7 @@ function predict_kdtree(X_predict::Array{T} where T<:Number, kdtree::KdTree; K::
     
     function kdtree_update_nearest!(X_vec::Array, kdtree::KdTree, kdtree_closest::Array{Union{KdTree, Nothing}},
                 kdtree_closest_val::Array{AbstractFloat})
+        # update current node by distance
         @assert size(kdtree_closest) == size(kdtree_closest_val)
         distance = dist_sim(kdtree.X_data, X_vec)
         if nothing in kdtree_closest
@@ -177,6 +181,7 @@ function predict_kdtree(X_predict::Array{T} where T<:Number, kdtree::KdTree; K::
     
     function kdtree_recursive_search!(X_vec::Array, kdtree::KdTree, depth::Integer, n_axes::Integer, 
                 kdtree_closest::Array{Union{KdTree, Nothing}}, kdtree_closest_val::Array{AbstractFloat})
+        # recursively search a kdtree for K nearest neighbors
         @assert size(kdtree_closest) == size(kdtree_closest_val)
         # check current node
         kdtree_update_nearest!(X_vec, kdtree, kdtree_closest, kdtree_closest_val)
