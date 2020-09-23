@@ -92,8 +92,8 @@ end
 The KdTree structure for `predict_kdtree`
 """
 mutable struct KdTree
-    X_data::Array{T} where T<:Number # 1d vector
-    Y_data::Number                   # 1d vector
+    X_data::Array{T} where T<:Number
+    Y_data::Number
     child_l::Union{KdTree,Nothing}
     child_r::Union{KdTree,Nothing}
 end
@@ -215,6 +215,171 @@ function predict_kdtree(X_predict::Array{T} where T<:Number, kdtree::KdTree; K::
                 break
             else
                 push!(K_nearest_votes, kdtree_closest[i].Y_data)
+            end
+        end
+        result[i] = majority_vote(K_nearest_votes)
+    end
+    return result
+end
+
+"""
+Ball Tree structure for `predict_balltree`
+"""
+mutable struct BallTree
+    X_data::Array{T} where T<:Number
+    Y_data::Number
+    pivot::Union{Array{T},Nothing} where T<:Number # defines pivot point of hypersphere
+    radius::AbstractFloat                            # defines radius of hypersphere
+    child_l::Union{BallTree,Nothing}
+    child_r::Union{BallTree,Nothing}
+end
+
+"""
+Create a `BallTree` given `X_data` and `Y_data`\\
+`X_data` has 2 dims, `Y_data` has 1 dims
+"""
+function create_balltree(X_data::Array{T} where T<:Number, Y_data::Array{T} where T<:Number)::BallTree
+    @assert ndims(X_data) == 2
+    @assert ndims(Y_data) == 1
+    @assert size(X_data)[1] == size(Y_data)[1]
+    balltree = nothing
+    if size(X_data)[1] == 1
+        balltree = BallTree(X_data[1, :], Y_data[1], nothing, 0.0, nothing, nothing)
+    else
+        # find pivot
+        pivot = vec(sum(X_data, dims=1)) ./ size(X_data)[1]
+        # find radius
+        radius = 0.0
+        for i in 1:size(X_data)[1]
+            X_vec = X_data[i, :]
+            dist = dist_sim(pivot, X_vec)
+            if dist > radius
+                radius = dist
+            end
+        end
+        # find greatest spread dimension
+        d_greatest_spread = 1
+        n_spread = 0.0
+        for i in 1:size(X_data)[2]
+            X_vec = X_data[:, i]
+            current_spread = maximum(X_vec) - minimum(X_vec)
+            if current_spread > n_spread
+                d_greatest_spread = i
+                n_spread = current_spread
+            end
+        end
+        data_combined = hcat(X_data, Y_data)
+        data_combined = sortslices(data_combined, by=m->m[d_greatest_spread], dims=1)
+        X_data = data_combined[:, 1:end-1]
+        Y_data = data_combined[:, end]
+        i_mid = div(size(X_data)[1], 2) + 1
+        node_X_data = X_data[i_mid, :]
+        node_Y_data = Y_data[i_mid]
+        balltree = BallTree(node_X_data, node_Y_data, pivot, radius, nothing, nothing)
+        if i_mid > 1
+            balltree.child_l = create_balltree(X_data[1:i_mid-1,:], Y_data[1:i_mid-1])
+        end
+        if i_mid < size(X_data)[1]
+            balltree.child_r = create_balltree(X_data[i_mid+1:end,:], Y_data[i_mid+1:end])
+        end
+    end
+    return balltree
+end
+
+"""
+Predict function for K Nearest Neighbor (Ball Tree Approach)\\
+`X_predict` is the data to predict\\
+`balltree` is a BallTree created from training data\\
+Returns an array of predictions
+"""
+function predict_balltree(X_predict::Array{T} where T<:Number, balltree::BallTree; K::Integer=5)::Array
+    @assert K > 0
+    @assert 0 < ndims(X_predict) <= 2
+    if ndims(X_predict) == 1
+        X_predict = reshape(X_predict, (1, size(X_predict)[1]))
+    end
+    @assert size(X_predict)[2] == size(balltree.X_data)[1]
+    
+    function balltree_closest_max(balltree_closest::Array{Union{BallTree, Nothing}},
+                balltree_closest_val::Array{AbstractFloat})::Tuple{Integer, AbstractFloat}
+        # find the maximum value in balltree_closest_val
+        # return its index and value
+        default = (0, 0.0)
+        for i in 1:size(balltree_closest)[1]
+            if balltree_closest[i] === nothing
+                break
+            elseif default[1] == 0 || (balltree_closest_val[i] > default[2])
+                default = (i, balltree_closest_val[i])
+            end
+        end
+        return default
+    end
+    
+    function balltree_update_nearest!(X_vec::Array, balltree::BallTree, balltree_closest::Array{Union{BallTree, Nothing}},
+                balltree_closest_val::Array{AbstractFloat})
+        # update current node by distance
+        @assert size(balltree_closest) == size(balltree_closest_val)
+        distance = dist_sim(balltree.X_data, X_vec)
+        if nothing in balltree_closest
+            for i in 1:size(balltree_closest)[1]
+                if balltree_closest[i] === nothing
+                    balltree_closest[i] = balltree
+                    balltree_closest_val[i] = distance
+                    break
+                end
+            end
+        else
+            curr_max = balltree_closest_max(balltree_closest, balltree_closest_val)
+            if distance < curr_max[2]
+                balltree_closest[curr_max[1]] = balltree
+                balltree_closest_val[curr_max[1]] = distance
+            end
+        end
+    end
+    
+    function balltree_recursive_search!(X_vec::Array, balltree::BallTree, balltree_closest::Array{Union{BallTree, Nothing}},
+            balltree_closest_val::Array{AbstractFloat})
+        # recursively search a balltree for K nearest neighbors
+        @assert size(balltree_closest) == size(balltree_closest_val)
+        if (!(nothing in balltree_closest) && (balltree.pivot !== nothing)
+                && (dist_sim(X_vec, balltree.pivot) - balltree.radius >= 
+                    balltree_closest_max(balltree_closest, balltree_closest_val)[2]))
+            return nothing
+        end
+        # check current node
+        balltree_update_nearest!(X_vec, balltree, balltree_closest, balltree_closest_val)
+        # run on children
+        if balltree.child_l === nothing || balltree.child_r === nothing
+            if balltree.child_l !== nothing
+                balltree_recursive_search!(X_vec, balltree.child_l, balltree_closest, balltree_closest_val)
+            end
+            if balltree.child_r !== nothing
+                balltree_recursive_search!(X_vec, balltree.child_r, balltree_closest, balltree_closest_val)
+            end
+        else
+            dist_left = dist_sim(X_vec, balltree.child_l.X_data)
+            dist_right = dist_sim(X_vec, balltree.child_r.X_data)
+            if dist_left < dist_right
+                balltree_recursive_search!(X_vec, balltree.child_l, balltree_closest, balltree_closest_val)
+                balltree_recursive_search!(X_vec, balltree.child_r, balltree_closest, balltree_closest_val)
+            else
+                balltree_recursive_search!(X_vec, balltree.child_r, balltree_closest, balltree_closest_val)
+                balltree_recursive_search!(X_vec, balltree.child_l, balltree_closest, balltree_closest_val)
+            end
+        end
+    end
+    
+    result = Array{Number}(undef, size(X_predict)[1])
+    for i in 1:size(X_predict)[1]
+        balltree_closest = Array{Union{BallTree, Nothing}}(nothing, K)
+        balltree_closest_val = Array{AbstractFloat}(undef, K)
+        balltree_recursive_search!(X_predict[i, :], balltree, balltree_closest, balltree_closest_val)
+        K_nearest_votes = Number[]
+        for i in 1:K
+            if balltree_closest[i] === nothing
+                break
+            else
+                push!(K_nearest_votes, balltree_closest[i].Y_data)
             end
         end
         result[i] = majority_vote(K_nearest_votes)
