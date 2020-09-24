@@ -64,7 +64,10 @@ If `X_data` has shape (M,N)\\
 Returns the actual computed values
 """
 function predict_proba(X_predict::Array{T} where T<:Number, weights::WeightsLinearSVM)::Array
-    @assert ndims(X_predict) == 2
+    @assert 1 <= ndims(X_predict) <= 2
+    if ndims(X_predict) == 1
+        X_predict = reshape(X_predict, (1, size(X_predict)[1]))
+    end
     @assert size(X_predict)[2] == size(weights.w)[1]
     prediction = vec(X_predict * weights.w .+ weights.b)
     return prediction
@@ -77,7 +80,10 @@ If `X_data` has shape (M,N)\\
 Returns the converted predictions, in {-1, 1}
 """
 function predict(X_predict::Array{T} where T<:Number, weights::WeightsLinearSVM)::Array
-    @assert ndims(X_predict) == 2
+    @assert 1 <= ndims(X_predict) <= 2
+    if ndims(X_predict) == 1
+        X_predict = reshape(X_predict, (1, size(X_predict)[1]))
+    end
     @assert size(X_predict)[2] == size(weights.w)[1]
     prediction = vec(X_predict * weights.w .+ weights.b)
     prediction .= map(m -> m >= 0 ? 1.0 : -1.0, prediction)
@@ -94,11 +100,12 @@ If `X_data` has shape (M,N)\\
 Returns trained weights as `WeightsLinearSVM` object
 
 ------
-Set `early_stop` to `false`, to force run maximum iteractions
+Set `early_stop` to `false`, to force run maximum iteractions\\
+Set `random_weights` to `false` to initialize weights of 0.0
 """
 function train_linear(X_data::Array{T} where T<:Number, Y_data::Array{T} where T<:Number, C::AbstractFloat;
         learning_rate::AbstractFloat=0.1, max_iter::Integer=1000, n_iter_no_change::Integer=5, tol::AbstractFloat=0.001,
-        verbose::Bool=false, shuffle::Bool=true, early_stop::Bool=true)::WeightsLinearSVM
+        verbose::Bool=false, shuffle::Bool=true, early_stop::Bool=true, random_weights::Bool=true)::WeightsLinearSVM
     @assert ndims(X_data) == ndims(Y_data) + 1 == 2
     @assert size(X_data)[1] == size(Y_data)[1]
     @assert max_iter >= 0
@@ -110,7 +117,12 @@ function train_linear(X_data::Array{T} where T<:Number, Y_data::Array{T} where T
         JuTools.shuffle_data!(X_data, Y_data)
     end
     # is it better to use zero weights than normal weights ?
-    weights = WeightsLinearSVM(C, Random.randn(size(X_data)[2]), Random.randn())
+    weights = nothing
+    if random_weights
+        weights = WeightsLinearSVM(C, Random.randn(size(X_data)[2]), Random.randn())
+    else
+        weights = WeightsLinearSVM(C, zeros(size(X_data)[2]), 0.0)
+    end
     best_cost = nothing
     n_cost_no_change = n_iter_no_change
     for i in 1:max_iter
