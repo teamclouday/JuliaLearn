@@ -124,6 +124,39 @@ function data_generate_linear_2d(;linear_func::Function=k -> k * 2 + 1, data_siz
             Y_data[i] = 1
         end
     end
+    shuffle_data!(X_data, Y_data)
+    return (X_data, Y_data)
+end
+
+"""
+Generate 2 dimensional data for testing\\
+`pos1` and `pos2` define the cluster center of 2 targets\\
+`radius1` and `radius2` define the cluster radius\\
+`random_scale` defines the scale of randomness\\
+Returns a Tuple for X and y, where 2 targets are balanced
+"""
+function data_generate_cluster_2d(;pos1::Tuple{AbstractFloat, AbstractFloat}=(10.0, 10.0), pos2::Tuple{AbstractFloat, AbstractFloat}=(30.0, 30.0),
+        radius1::AbstractFloat=5.0, radius2::AbstractFloat=5.0, random_scale::AbstractFloat=10.0, data_size::Integer=1000)::Tuple{Array, Array}
+    @assert radius1 > 0
+    @assert radius2 > 0
+    @assert data_size >= 2
+    data_size_1 = div(data_size, 2)
+    data_size_2 = data_size - data_size_1
+    step_scale = min(radius1 / 10.0, radius2 / 10.0)
+    step_scale = 10.0 ^ (trunc(Int32, step_scale) - 2)
+    X_data_1 = Random.rand(-radius1:step_scale:radius1, (data_size_1, 2))
+    X_data_2 = Random.rand(-radius2:step_scale:radius2, (data_size_2, 2))
+    X_data_1[:, 1] .= X_data_1[:, 1] .+ pos1[1]
+    X_data_1[:, 2] .= X_data_1[:, 2] .+ pos1[2]
+    X_data_2[:, 1] .= X_data_2[:, 1] .+ pos2[1]
+    X_data_2[:, 2] .= X_data_2[:, 2] .+ pos2[2]
+    X_data_1 .= X_data_1 .+ (Random.randn(size(X_data_1)) .* random_scale)
+    X_data_2 .= X_data_2 .+ (Random.randn(size(X_data_2)) .* random_scale)
+    Y_data_1 = ones(data_size_1)
+    Y_data_2 = zeros(data_size_2)
+    X_data = cat(X_data_1, X_data_2, dims=1)
+    Y_data = cat(Y_data_1, Y_data_2, dims=1)
+    shuffle_data!(X_data, Y_data)
     return (X_data, Y_data)
 end
 
