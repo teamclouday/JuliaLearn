@@ -201,11 +201,12 @@ If `X` is shape (M, N)\\
 Returns `beta` in shape (N+1,)
 
 ------
-Set `early_stop` to `false`, to force run maximum iteractions
+Set `early_stop` to `false`, to force run maximum iteractions\\
+Set `random_weights` to `false` to initialize weights of 0.0
 """
 function train(X::Array, y::Array; learning_rate::AbstractFloat=0.1, max_iter::Integer=1000,
         n_iter_no_change::Integer=5, tol::AbstractFloat=0.001, verbose::Bool=false,
-        shuffle::Bool=true, early_stop::Bool=true)::Array
+        shuffle::Bool=true, early_stop::Bool=true, random_weights::Bool=true)::Array
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert size(X)[1] == size(y)[1]
@@ -221,7 +222,12 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.1, max_iter::I
     end
     X = CUDA.CuArray(X)
     y = CUDA.CuArray(y)
-    beta = CuArray(Random.randn(size(X)[2]))
+    beta = nothing
+    if random_weights
+        beta = CuArray(Random.randn(size(X)[2]))
+    else
+        beta = CuArray(zeros(size(X)[2]))
+    end
     best_cost = nothing
     n_cost_no_change = n_iter_no_change
     for i = 1:max_iter
