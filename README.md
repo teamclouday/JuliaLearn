@@ -9,4 +9,4 @@ By implementing multiple popular ML algorithms
 
 ### Note 
 The code in this project are mainly for learning and practicing purposes, not for practical use  
-For practical ML libraries in Julia, I recommend using [Flux](https://fluxml.ai/Flux.jl/stable/)  
+For practical ML libraries in Julia, I recommend using [Flux](https://fluxml.ai/Flux.jl/stable/) and [MLJ](https://github.com/alan-turing-institute/MLJ.jl)
