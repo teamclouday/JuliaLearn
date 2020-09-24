@@ -5,6 +5,9 @@ export train, predict, predict_proba, scale, cost, accuracy
 import Random
 import Statistics
 
+include("../tools.jl")
+import .JuTools
+
 """
 Helper function to scale input `X` to unit variance\\
 `X` is required to have dimension 2
@@ -140,15 +143,14 @@ If `X` is shape (M, N)\\
 `y` should be (M,)\\
 `max_iter` should be >= 0
 ------
-If `return_all`, then return all `beta`(weights) for each iteration\\
-Else, return the final `beta`(weight) after iterations\\
-Each `beta` is in shape (N+1,)
+Returns `beta` in shape (N+1,)
+
 ------
-Set `tol` to 0.0, to force run maximum iteractions possible in `Float64` precision
+Set `early_stop` to `false`, to force run maximum iteractions
 """
 function train(X::Array, y::Array; learning_rate::AbstractFloat=0.1, max_iter::Integer=1000,
-        n_iter_no_change::Integer=5, tol::AbstractFloat=0.001, return_all::Bool=false,
-        verbose::Bool=false)::Array
+        n_iter_no_change::Integer=5, tol::AbstractFloat=0.001, verbose::Bool=false,
+        shuffle::Bool=true, early_stop::Bool=true)::Array
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert size(X)[1] == size(y)[1]
@@ -157,27 +159,18 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.1, max_iter::I
     @assert tol >= 0.0
     X = hcat(X, ones(size(X)[1])) # for constant multiplication
     X .= Float64.(X)
-    y .= Float64.(y)
+    y = Float64.(y)
+    if shuffle
+        JuTools.shuffle_data!(X, y)
+    end
     beta = Random.randn(size(X)[2])
     best_cost = nothing
     n_cost_no_change = n_iter_no_change
-    res = nothing
-    if return_all
-        res = reshape(beta, (1, size(beta)[1]))
-    else
-        res = beta
-    end
     for i = 1:max_iter
-        if n_cost_no_change <= 0
+        if n_cost_no_change <= 0 && early_stop
             break
         end
-        if return_all
-            beta = learn(X, y, beta, learning_rate)
-            res = cat(res, reshape(beta, (1, size(beta)[1])), dims=1)
-        else
-            learn!(X, y, beta, learning_rate)
-            res .= beta
-        end
+        learn!(X, y, beta, learning_rate)
         new_cost = cost(X, y, beta)
         if verbose
             acc = accuracy(predict(X, beta), y)
@@ -186,18 +179,20 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.1, max_iter::I
             println("Accuracy = ", acc)
             println()
         end
-        if best_cost === nothing || isnan(best_cost)
-            best_cost = new_cost
-        else
-            if new_cost > best_cost - tol
-                n_cost_no_change -= 1
+        if early_stop
+            if best_cost === nothing || isnan(best_cost)
+                best_cost = new_cost
             else
-                best_cost = min(new_cost, best_cost)
-                n_cost_no_change = n_iter_no_change
+                if new_cost > best_cost - tol
+                    n_cost_no_change -= 1
+                else
+                    best_cost = min(new_cost, best_cost)
+                    n_cost_no_change = n_iter_no_change
+                end
             end
         end
     end
-    return res
+    return beta
 end
 
 """
