@@ -218,7 +218,7 @@ function kernel_sigmoid(X1::Array{T} where T<:Number, X2::Array{T} where T<:Numb
     @assert ndims(X1) == ndims(X2) == 2
     @assert size(X1)[2] == size(X2)[2]
     result = gamma .* (X1 * X2') .+ r
-    result .= tanh.(gamma)
+    result .= tanh.(result)
     return result
 end
 
@@ -386,8 +386,8 @@ function learn_step!(X_data::Array{T} where T<:Number, Y_data::Array{T} where T<
     end
     weights.error[non_optimized_ids] .= weights.error[non_optimized_ids] .+
         ((Y1*(a1-alpha1)) .* kerr1) .+ ((Y2*(a2-alpha2)) .* kerr2) .- (b_new - weights.b)
-    # weights.error[id1] = 0.0
-    # weights.error[id2] = 0.0
+    weights.error[id1] = 0.0
+    weights.error[id2] = 0.0
     # update alpha and b
     weights.b = b_new
     weights.alpha[id1] = a1
@@ -472,6 +472,9 @@ Returns the actual predictions
 """
 function predict_proba(X_predict::Array{T} where T<:Number, X_data::Array{T} where T<:Number,
         Y_data::Array{T} where T<:Number, weights::WeightsSVM)::Array
+    if ndims(X_predict) == 1
+        X_predict = reshape(X_predict, (1, size(X_predict)[1]))
+    end
     @assert ndims(X_predict) == ndims(X_data) == ndims(Y_data) + 1 == 2
     @assert size(X_predict)[2] == size(X_data)[2]
     result = nothing
@@ -500,6 +503,9 @@ Returns the converted predictions, in {-1, 1}
 """
 function predict(X_predict::Array{T} where T<:Number, X_data::Array{T} where T<:Number,
         Y_data::Array{T} where T<:Number, weights::WeightsSVM)::Array
+    if ndims(X_predict) == 1
+        X_predict = reshape(X_predict, (1, size(X_predict)[1]))
+    end
     @assert ndims(X_predict) == ndims(X_data) == ndims(Y_data) + 1 == 2
     @assert size(X_predict)[2] == size(X_data)[2]
     result = nothing
