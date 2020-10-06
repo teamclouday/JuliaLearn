@@ -152,6 +152,10 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
                     max_ratio = ratio_max
                 end
             else
+                # skip visited categorical feature (homogeneous)
+                if length(X_vec_unique) <= 1
+                    continue
+                end
                 # categorical data, then compute by splitting on each category
                 Ii = info(Y_data)
                 gain = Ii
