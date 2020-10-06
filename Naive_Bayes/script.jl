@@ -50,10 +50,10 @@ function train(X_data::Array{T} where T<:Number, Y_data::Array{K} where K<:Numbe
 end
 
 """
-Vectorized guassian function\\
+Vectorized gaussian function\\
 Returns the product of P(xi|y)
 """
-function guassian(X_vec::Array, mean::Array, var::Array)::AbstractFloat
+function gaussian(X_vec::Array, mean::Array, var::Array)::AbstractFloat
     @assert ndims(X_vec) == ndims(mean) == ndims(var) == 1
     @assert length(X_vec) == length(mean) == length(var)
     left = 1.0 ./ sqrt.((2.0 * pi) .* var)
@@ -77,7 +77,7 @@ function predict(X_data::Array{T} where T<:Number, data::NaiveBayes)::Array
         X_vec = X_data[i, :]
         Y_dict = Dict{Number,AbstractFloat}()
         for Y_val in keys(data.pY)
-            Y_dict[Y_val] = data.pY[Y_val] * guassian(X_vec, data.mean[Y_val], data.var[Y_val])
+            Y_dict[Y_val] = data.pY[Y_val] * gaussian(X_vec, data.mean[Y_val], data.var[Y_val])
         end
         prediction[i] = sort(collect(Y_dict), by=m->m[2], rev=true)[1][1]
     end
