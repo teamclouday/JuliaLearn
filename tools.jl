@@ -9,10 +9,10 @@ import Random
 """
 Compute accuracy given prediction and real values
 """
-function compute_accuracy(y_pred::Array{T} where T<:Number, y_real::Array{T} where T<:Number)::AbstractFloat
+function compute_accuracy(y_pred::Array, y_real::Array)::AbstractFloat
     @assert ndims(y_pred) == ndims(y_real) == 1
     @assert size(y_pred) == size(y_real)
-    acc = Statistics.mean(float.(y_pred) .== float.(y_real))
+    acc = Statistics.mean(y_pred .== y_real)
     return acc
 end
 
