@@ -23,6 +23,9 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
     @assert size(X_data)[1] == size(Y_data)[1]
     @assert max_depth >= 1
     
+    """
+    Output the most frequent value in the vector
+    """
     function majority(Y_vec::Array)::Number
         unique_vals = Dict{Number, Integer}()
         for Y_val in Y_vec
@@ -36,6 +39,9 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
         return result[end][1]
     end
     
+    """
+    Check if vector has same value
+    """
     function is_same_class(Y_vec::Array)::Bool
         val = Y_vec[1]
         for m in Y_vec[2:end]
@@ -46,6 +52,9 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
         return true
     end
     
+    """
+    Get an array of unique values from a vector
+    """
     function get_unique_array(X_vec::Array)::Array
         X_max = maximum(X_vec)
         X_min = minimum(X_vec)
@@ -59,6 +68,9 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
         return result
     end
     
+    """
+    The entropy function
+    """
     function info(Y_data::Array)::AbstractFloat
         portion = Dict{Number,Integer}()
         for m in Y_data
@@ -77,6 +89,11 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
         return result
     end
 
+    """
+    Detect types for each column of `X_data`\\
+    `true` if continuous\\
+    `false` if categorical
+    """
     function detect_types(X_data::Array)::Array
         result = Array{Bool}(undef, size(X_data)[2])
         for i in 1:size(X_data)[2]
@@ -90,7 +107,7 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
         return result
     end
     
-    function create_decision_tree_recursive(X_data::Array, Y_data::Array, X_index_visited::Array, X_type::Array, max_depth::Integer)::DecisionTree
+    function create_decision_tree_recursive(X_data::Array, Y_data::Array, X_type::Array, max_depth::Integer)::DecisionTree
         if is_same_class(Y_data)
             return DecisionTree(-1, nothing, Y_data[1])
         end
@@ -101,9 +118,6 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
         max_ratio = 0.0
         max_fn = nothing
         for i in 1:size(X_data)[2]
-            if i in X_index_visited
-                continue
-            end
             X_vec_unique = get_unique_array(X_data[:, i])
             if X_type[i]
                 # continous data, then choose binary threshold
@@ -160,8 +174,6 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
         if max_index < 0
             return DecisionTree(-1, nothing, majority(Y_data))
         end
-        #X_index_visited = copy(X_index_visited)
-        #push!(X_index_visited, max_index)
         children = Dict{Function,DecisionTree}()
         if max_fn === nothing
             # categorical
@@ -171,23 +183,23 @@ function create_decision_tree(X_data::Array{T} where T<:Number, Y_data::Array{T}
                 identify = fn.(X_data[:, max_index])
                 X_part = X_data[identify, :]
                 Y_part = Y_data[identify]
-                children[fn] = create_decision_tree_recursive(X_part, Y_part, X_index_visited, X_type, max_depth-1)
+                children[fn] = create_decision_tree_recursive(X_part, Y_part, X_type, max_depth-1)
             end
         else
             # continuous
             identify_1 = max_fn.(X_data[:, max_index])
             X_part_1 = X_data[identify_1, :]
             Y_part_1 = Y_data[identify_1]
-            children[max_fn] = create_decision_tree_recursive(X_part_1, Y_part_1, X_index_visited, X_type, max_depth-1)
+            children[max_fn] = create_decision_tree_recursive(X_part_1, Y_part_1, X_type, max_depth-1)
             identify_2 = (!max_fn).(X_data[:, max_index])
             X_part_2 = X_data[identify_2, :]
             Y_part_2 = Y_data[identify_2]
-            children[(!max_fn)] = create_decision_tree_recursive(X_part_2, Y_part_2, X_index_visited, X_type, max_depth-1)
+            children[(!max_fn)] = create_decision_tree_recursive(X_part_2, Y_part_2, X_type, max_depth-1)
         end
         return DecisionTree(max_index, children, nothing)
     end
     
-    return create_decision_tree_recursive(X_data, Y_data, [], detect_types(X_data), max_depth)
+    return create_decision_tree_recursive(X_data, Y_data, detect_types(X_data), max_depth)
 end
 
 """
