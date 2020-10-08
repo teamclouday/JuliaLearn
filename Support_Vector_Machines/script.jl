@@ -43,7 +43,7 @@ If `X_data` has shape (M,N)\\
 `weights.w` has shape (N,)\\
 Update the weights in place
 """
-function learn!(X_data::Array{T} where T<:Number, Y_data::Array{T} where T<:Number, weights::WeightsLinearSVM, alpha::AbstractFloat)
+function learn!(X_data::Array{T} where T<:Number, Y_data::Array{T} where T<:Number, weights::WeightsLinearSVM, momentum::WeightsLinearSVM, alpha::AbstractFloat)
     @assert ndims(Y_data) == ndims(weights.w) == 1
     @assert size(X_data) == (size(Y_data)[1], size(weights.w)[1])
     # compute deciding feature
@@ -51,11 +51,13 @@ function learn!(X_data::Array{T} where T<:Number, Y_data::Array{T} where T<:Numb
     # update w
     gradient_w = weights.w .+ (weights.C / size(X_data)[1]) .* vec(-(Y_data .* decide)' * X_data)
     gradient_w .= gradient_w .* alpha
-    weights.w .= weights.w .- gradient_w
+    momentum.w .= gradient_w .+ (0.9 .* momentum.w)
+    weights.w .= weights.w .- momentum.w
     # update b
     gradient_b = (weights.C / size(X_data)[1]) * sum(-(Y_data .* decide))
     gradient_b *= alpha
-    weights.b = weights.b - gradient_b
+    momentum.b = gradient_b + (0.9 * momentum.b)
+    weights.b = weights.b - momentum.b
     return nothing
 end
 
@@ -125,13 +127,14 @@ function train_linear(X_data::Array{T} where T<:Number, Y_data::Array{T} where T
     else
         weights = WeightsLinearSVM(C, zeros(size(X_data)[2]), 0.0)
     end
+    momentum = WeightsLinearSVM(C, copy(weights.w), weights.b)
     best_cost = nothing
     n_cost_no_change = n_iter_no_change
     for i in 1:max_iter
         if n_cost_no_change <= 0 && early_stop
             break
         end
-        learn!(X_data, Y_data, weights, learning_rate)
+        learn!(X_data, Y_data, weights, momentum, learning_rate)
         new_cost = cost(X_data, Y_data, weights)
         if verbose
             acc = JuTools.compute_accuracy(predict(X_data, weights), Y_data)
