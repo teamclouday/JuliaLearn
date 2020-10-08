@@ -100,7 +100,7 @@ Returns `nothing`
 ------
 Note: `beta` will be updated inplace
 """
-function learn!(X::Array, y::Array, beta::Array, alpha::AbstractFloat)
+function learn!(X::Array, y::Array, beta::Array, momentum::Array, alpha::AbstractFloat)
     @assert ndims(X) == 2
     @assert ndims(y) == 1
     @assert ndims(beta) == 1
@@ -110,30 +110,9 @@ function learn!(X::Array, y::Array, beta::Array, alpha::AbstractFloat)
     gradients = X' * offset
     gradients .= gradients ./ size(X)[1]
     gradients .= gradients .* alpha
-    beta .= beta .- gradients
+    momentum .= gradients .+ (0.9 .* momentum)
+    beta .= beta .- momentum
     return nothing
-end
-
-"""
-Learning function for Gradient Descent\\
-If `X` is shape (M, N)\\
-`y` should be (M,)\\
-`beta` should be (N,)
-------
-Returns updated `beta`
-"""
-function learn(X::Array, y::Array, beta::Array, alpha::AbstractFloat)::Array
-    @assert ndims(X) == 2
-    @assert ndims(y) == 1
-    @assert ndims(beta) == 1
-    @assert size(X) == (size(y)[1], size(beta)[1])
-    predictions = predict_proba(X, beta)
-    offset = predictions .- y
-    gradients = X' * offset
-    gradients .= gradients ./ size(X)[1]
-    gradients .= gradients .* alpha
-    beta = beta .- gradients
-    return beta
 end
 
 """
@@ -170,13 +149,14 @@ function train(X::Array, y::Array; learning_rate::AbstractFloat=0.1, max_iter::I
     else
         beta = zeros(size(X)[2])
     end
+    momentum = zeros(size(X)[2])
     best_cost = nothing
     n_cost_no_change = n_iter_no_change
     for i = 1:max_iter
         if n_cost_no_change <= 0 && early_stop
             break
         end
-        learn!(X, y, beta, learning_rate)
+        learn!(X, y, beta, momentum, learning_rate)
         new_cost = cost(X, y, beta)
         if verbose
             acc = accuracy(predict(X, beta), y)
