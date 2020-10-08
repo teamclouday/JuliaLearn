@@ -108,18 +108,12 @@ Set `early_stop` to `false`, to force run maximum iteractions\\
 Set `random_weights` to `false` to initialize weights of 0.0
 """
 function train_linear(X_data::Array{T} where T<:Number, Y_data::Array{T} where T<:Number, C::AbstractFloat;
-        learning_rate::AbstractFloat=0.1, max_iter::Integer=1000, n_iter_no_change::Integer=5, tol::AbstractFloat=0.001,
-        verbose::Bool=false, shuffle::Bool=true, early_stop::Bool=true, random_weights::Bool=true)::WeightsLinearSVM
+        learning_rate::AbstractFloat=0.1, max_iter::Integer=1000, verbose::Bool=false, random_weights::Bool=true)::WeightsLinearSVM
     @assert ndims(X_data) == ndims(Y_data) + 1 == 2
     @assert size(X_data)[1] == size(Y_data)[1]
     @assert max_iter >= 0
-    @assert n_iter_no_change >= 0
-    @assert tol >= 0
     X_data = Float64.(X_data)
     Y_data = Float64.(Y_data)
-    if shuffle
-        JuTools.shuffle_data!(X_data, Y_data)
-    end
     # is it better to use zero weights than normal weights ?
     weights = nothing
     if random_weights
@@ -128,12 +122,10 @@ function train_linear(X_data::Array{T} where T<:Number, Y_data::Array{T} where T
         weights = WeightsLinearSVM(C, zeros(size(X_data)[2]), 0.0)
     end
     momentum = WeightsLinearSVM(C, zeros(size(X_data)[2]), 0.0)
+    best_weights = WeightsLinearSVM(C, copy(weights.w), weights.b)
     best_cost = nothing
-    n_cost_no_change = n_iter_no_change
     for i in 1:max_iter
-        if n_cost_no_change <= 0 && early_stop
-            break
-        end
+        JuTools.shuffle_data!(X_data, Y_data)
         learn!(X_data, Y_data, weights, momentum, learning_rate)
         new_cost = cost(X_data, Y_data, weights)
         if verbose
@@ -143,20 +135,17 @@ function train_linear(X_data::Array{T} where T<:Number, Y_data::Array{T} where T
             println("Accuracy = $acc")
             println()
         end
-        if early_stop
-            if best_cost === nothing || isnan(best_cost)
-                best_cost = new_cost
-            else
-                if new_cost > best_cost - tol
-                    n_cost_no_change -= 1
-                else
-                    best_cost = min(new_cost, best_cost)
-                    n_cost_no_change = n_iter_no_change
-                end
+        if best_cost === nothing
+            best_cost = new_cost
+        else
+            if new_cost <= best_cost
+                best_cost = min(new_cost, best_cost)
+                best_weights.w = copy(weights.w)
+                best_weights.b = weights.b
             end
         end
     end
-    return weights
+    return best_weights
 end
 
 
