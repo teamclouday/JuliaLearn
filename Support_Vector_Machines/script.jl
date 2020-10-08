@@ -127,7 +127,7 @@ function train_linear(X_data::Array{T} where T<:Number, Y_data::Array{T} where T
     else
         weights = WeightsLinearSVM(C, zeros(size(X_data)[2]), 0.0)
     end
-    momentum = WeightsLinearSVM(C, copy(weights.w), weights.b)
+    momentum = WeightsLinearSVM(C, zeros(size(X_data)[2]), 0.0)
     best_cost = nothing
     n_cost_no_change = n_iter_no_change
     for i in 1:max_iter
